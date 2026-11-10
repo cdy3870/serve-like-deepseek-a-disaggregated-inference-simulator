@@ -11,6 +11,8 @@ python scaffold.py
 ## Steps
 
 - [x] **1.** make_workload
+- [x] **2.** fit_cost_model
+- [x] **3.** tier_demand
 
 ---
 
