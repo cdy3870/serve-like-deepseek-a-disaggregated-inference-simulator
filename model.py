@@ -59,10 +59,47 @@ def fit_cost_model(samples):
 # Step 3 - tier_demand
 def context_tier(ctx, tiers=(16000, 64000, 256000)):
     # TODO: number of boundaries at or below ctx
-    pass
+    count = 0
+    for tier in tiers:
+        if tier <= ctx:
+            count += 1
+
+    return count
 
 
 def tier_demand(requests, coeffs, tiers=(16000, 64000, 256000)):
     # TODO: per-request tier, per-tier counts, demand in seconds and shares
-    pass
+    total = 0
+    result = {"tier": []}
+    counts = {i:0 for i in range(len(tiers) + 1)}
+    demand_s = {i:0.0 for i in range(len(tiers) + 1)}
+    for req in requests:
+        tier = context_tier(req["ctx"], tiers)
+        demand = prefill_cost(req["ctx"] - req["cached"], req["cached"], coeffs) / 1e9
+        total += demand
+        counts[tier] += 1
+        result.setdefault("tier", []).append(tier)
+        demand_s[tier] = round(demand, 3)
+    result["counts"] = list(counts.values())
+    result["demand_s"] = list(demand_s.values()) 
+    if total == 0:
+        shares = [0.0 for i in range(len(result["demand_s"]))]
+    else:
+        shares = []
+        for i in range(len(result["demand_s"])):
+            shares.append(round(result["demand_s"][i] / total, 4))
+
+    result["shares"] = shares
+
+    return result
+
+# Step 4 - decode_step_time
+def ep_params(ep, expert_bytes_total, hbm_bw, fixed_ms=0.6, alpha=0.05, beta=1e-5):
+    # TODO: t0 in ms from the expert read at this EP plus the fixed part
+    return {"t0": expert_bytes_total / ep / hbm_bw * 1000 + fixed_ms, "alpha": alpha, "beta": beta, "moe_lb": 1.0}
+
+
+def decode_step_time(B, K, params):
+    # TODO: t0 * moe_lb + alpha B + beta K
+    return params["t0"] * params.get("moe_lb", 1.0) + params["alpha"] * B + params["beta"] * K
 
