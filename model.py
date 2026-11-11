@@ -103,3 +103,32 @@ def decode_step_time(B, K, params):
     # TODO: t0 * moe_lb + alpha B + beta K
     return params["t0"] * params.get("moe_lb", 1.0) + params["alpha"] * B + params["beta"] * K
 
+# Step 5 - chunk_for
+import math
+
+
+def chunk_for(remaining_ns, c, coeffs, cap=32768):
+    # TODO: positive root of a q^2 + (b c + d) q - R, floored, checked, capped
+
+    if remaining_ns <= 0:
+        return 0
+
+        
+
+    b = coeffs[1] * c + coeffs[2]
+
+    if coeffs[0] == 0:
+        q = remaining_ns / b
+    else:
+        q = (-b + math.sqrt(b ** 2 + 4 * coeffs[0] * remaining_ns)) / (2 * coeffs[0])
+    
+    
+    q = math.floor(q + 1e-9)
+    cost = prefill_cost(q, c, coeffs)
+
+    while q > 0 and cost > remaining_ns:
+        q -= 1
+        cost = prefill_cost(q, c, coeffs)
+
+    return min(q, cap)
+
