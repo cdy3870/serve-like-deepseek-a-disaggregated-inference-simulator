@@ -132,3 +132,24 @@ def chunk_for(remaining_ns, c, coeffs, cap=32768):
 
     return min(q, cap)
 
+# Step 6 - plan_prefill_step
+def plan_prefill_step(queue, budget_ns, coeffs, cap=32768):
+    # TODO: FIFO chunks under the budget; return chunks, used_ns, left_ns
+    records = []
+    left = budget_ns
+    for i, chunk in enumerate(queue):
+        chunk_left = chunk["left"]
+        prefix = chunk["prefix"]
+        q = min(chunk_for(left, prefix, coeffs, cap), chunk_left)
+        if q <= 0:
+            break
+
+        records.append((i, q))
+
+        cost = prefill_cost(q, prefix, coeffs)
+        left -= cost
+
+    result = {"chunks": records, "used_ns": int(round(budget_ns - left)), "left_ns": int(round(left))}
+
+    return result
+
