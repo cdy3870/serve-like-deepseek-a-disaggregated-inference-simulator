@@ -153,3 +153,52 @@ def plan_prefill_step(queue, budget_ns, coeffs, cap=32768):
 
     return result
 
+# Step 7 - PrefillEngine
+import collections
+
+
+class PrefillEngine:
+    def __init__(self, coeffs, budget_ns, cap=32768):
+        # TODO: coeffs, budget_ns, cap, queue deque, busy_ms
+        self.coeffs = coeffs
+        self.budget_ns = budget_ns
+        self.queue = collections.deque()
+        self.cap = cap
+
+        self.busy_ms = 0.0
+
+    def submit(self, req):
+        self.queue.append({"id": req["id"], "left": req["ctx"] - req["cached"], "prefix": req["cached"], "t_arrive": req["t_arrive"], "req": req})
+
+
+    def pending_tokens(self):
+        sum_left = 0
+        for item in list(self.queue):
+            sum_left += item["left"]
+
+        return sum_left
+
+    def step(self, now_ms):
+        plan = plan_prefill_step(list(self.queue), self.budget_ns, self.coeffs, self.cap)
+        if not plan["chunks"]:
+            return []
+        step_ms = plan["used_ns"] / 1e6
+        self.busy_ms += step_ms
+
+        entries = list(self.queue)
+        for i, q in plan["chunks"]:
+            entries[i]["left"] -= q
+            entries[i]["prefix"] += q
+
+        done, keep = [], collections.deque()
+        for e in entries:
+            if e["left"] == 0:
+                r = e["req"]
+                r["t_prefill_done"] = now_ms + step_ms
+                r["ttft_ms"] = now_ms + step_ms - r["t_arrive"] * 1000
+                done.append(r)
+            else:
+                keep.append(e)
+        self.queue = keep
+        return done
+
